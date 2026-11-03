@@ -1,82 +1,58 @@
-const express = require('express');
-const app = express();
-const PORT = 3000;
+require('dotenv').config();
 
-// Middleware agar req.body (JSON) dapat dibaca
+const express = require('express');
+const cors = require('cors');
+const mongoose = require('mongoose');
+
+const pesananGalonRoutes = require('./routes/pesananGalonRoutes');
+const depotRoutes = require('./routes/depotRoutes');
+const { notFound, errorHandler } = require('./middlewares/errorHandler');
+
+const app = express();
+
+// Middleware JSON
 app.use(express.json());
 
-// Data sementara (disimpan di memori, hilang saat server restart)
-let mahasiswa = [
-  { id: 1, nama: 'Andi', jurusan: 'Sistem Informasi' },
-  { id: 2, nama: 'Budi', jurusan: 'Informatika' },
-];
-let nextId = 3;
+// Middleware CORS
+app.use(cors({
+    origin: process.env.CORS_ORIGIN,
+    methods: ['GET', 'POST']
+}));
 
-// GET / -> memastikan server berjalan
+// Halaman utama
 app.get('/', (req, res) => {
-  res.send('Server Express.js berjalan!');
+    res.json({
+        status: 'success',
+        message: 'RESTful API Depot Air Minum Berhasil Berjalan',
+        mahasiswa: 'Aulia Syalsabila Ramadhani',
+        nim: '2428240155'
+    });
 });
 
-// GET /mahasiswa -> seluruh data, bisa difilter: /mahasiswa?jurusan=Informatika
-app.get('/mahasiswa', (req, res) => {
-  const { jurusan } = req.query;
+// Routes Pesanan Galon
+app.use('/pesanan-galon', pesananGalonRoutes);
 
-  if (jurusan) {
-    const hasil = mahasiswa.filter((m) => m.jurusan === jurusan);
-    return res.json(hasil);
-  }
+// Routes Depot
+app.use('/depot', depotRoutes);
 
-  res.json(mahasiswa);
-});
+// Error handling 404
+app.use(notFound);
 
-// GET /mahasiswa/:id -> satu data berdasarkan id
-app.get('/mahasiswa/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const data = mahasiswa.find((m) => m.id === id);
+// Error handling terpusat
+app.use(errorHandler);
 
-  if (!data) return res.status(404).json({ message: 'Data tidak ditemukan' });
-  res.json(data);
-});
+// Koneksi MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => {
+        console.log('MongoDB berhasil terhubung');
 
-// POST /mahasiswa -> tambah data baru
-app.post('/mahasiswa', (req, res) => {
-  const { nama, jurusan } = req.body;
-
-  if (!nama || !jurusan) {
-    return res.status(400).json({ message: 'nama dan jurusan wajib diisi' });
-  }
-
-  const baru = { id: nextId++, nama, jurusan };
-  mahasiswa.push(baru);
-  res.status(201).json(baru);
-});
-
-// PUT /mahasiswa/:id -> ubah data
-app.put('/mahasiswa/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const index = mahasiswa.findIndex((m) => m.id === id);
-
-  if (index === -1) {
-    return res.status(404).json({ message: 'Data tidak ditemukan' });
-  }
-
-  mahasiswa[index] = { ...mahasiswa[index], ...req.body, id };
-  res.json(mahasiswa[index]);
-});
-
-// DELETE /mahasiswa/:id -> hapus data
-app.delete('/mahasiswa/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const index = mahasiswa.findIndex((m) => m.id === id);
-
-  if (index === -1) {
-    return res.status(404).json({ message: 'Data tidak ditemukan' });
-  }
-
-  mahasiswa.splice(index, 1);
-  res.status(204).send();
-});
-
-app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`);
-});
+        app.listen(process.env.PORT, () => {
+            console.log(
+                `Server berjalan di http://localhost:${process.env.PORT}`
+            );
+        });
+    })
+    .catch((error) => {
+        console.error('Koneksi MongoDB gagal:', error.message);
+        process.exit(1);
+    });
